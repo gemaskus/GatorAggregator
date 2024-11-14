@@ -50,6 +50,7 @@ func main() {
 	}
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handlerRegister)
+	cmds.register("reset", handlerReset)
 
 	args := os.Args
 
@@ -112,6 +113,14 @@ func handlerRegister(s *state, cmd command) error {
 	fmt.Printf("New User created: %v\n", newUser)
 
 	return nil
+}
+
+func handlerReset(s *state, cmd command) error {
+	if len(cmd.args) != 0 {
+		return fmt.Errorf("too many arguments for the reset command.")
+	}
+
+	return s.db.Reset(context.Background())
 }
 
 func (cmds *commands) register(name string, f func(*state, command) error) {
