@@ -28,6 +28,22 @@ type commands struct {
 	handlers map[string]func(*state, command) error
 }
 
+type RSSFeed struct {
+	Channel struct {
+		Title       string    `xml:"title"`
+		Link        string    `xml:"link"`
+		Description string    `xml:"description"`
+		Item        []RSSItem `xml:"item"`
+	}
+}
+
+type RSSItem struct {
+	Title       string `xml:"title"`
+	Link        string `xml:"link"`
+	Description string `xml:"description"`
+	PubDate     string `xml:"pubDate"`
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -153,4 +169,8 @@ func (cmds *commands) run(s *state, cmd command) error {
 		return handler(s, cmd)
 	}
 	return fmt.Errorf("Command not found: %s", cmd.name)
+}
+
+func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+
 }
