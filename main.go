@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/xml"
 	"fmt"
+	"html"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -34,7 +38,7 @@ type RSSFeed struct {
 		Link        string    `xml:"link"`
 		Description string    `xml:"description"`
 		Item        []RSSItem `xml:"item"`
-	}
+	} `xml:"channel"`
 }
 
 type RSSItem struct {
@@ -68,6 +72,7 @@ func main() {
 	cmds.register("register", handlerRegister)
 	cmds.register("reset", handlerReset)
 	cmds.register("users", handlerUsers)
+	cmds.register("agg", handlerAgg)
 
 	args := os.Args
 
@@ -160,6 +165,19 @@ func handlerUsers(s *state, cmd command) error {
 	return nil
 }
 
+func handlerAgg(s *state, cmd command) error {
+
+	url := "https://www.wagslane.dev/index.xml"
+
+	RSSfeed, err := fetchFeed(context.Background(), url)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%v", RSSfeed)
+	return nil
+}
+
 func (cmds *commands) register(name string, f func(*state, command) error) {
 	cmds.handlers[name] = f
 }
@@ -172,5 +190,35 @@ func (cmds *commands) run(s *state, cmd command) error {
 }
 
 func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+	request, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
+	request.Header.Add("User-Agent", "gator")
+
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return &RSSFeed{}, err
+	}
+	newRSSFeed := RSSFeed{}
+	err = xml.Unmarshal(body, &newRSSFeed)
+	if err != nil {
+		return &RSSFeed{}, nil
+	}
+
+	newRSSFeed.Channel.Title = html.UnescapeString(newRSSFeed.Channel.Title)
+	newRSSFeed.Channel.Description = html.UnescapeString(newRSSFeed.Channel.Description)
+	for _, item := range newRSSFeed.Channel.Item {
+		item.Title = html.UnescapeString(item.Title)
+		item.Description = html.UnescapeString(item.Description)
+	}
+
+	return &newRSSFeed, nil
 
 }
