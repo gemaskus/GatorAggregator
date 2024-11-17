@@ -74,6 +74,7 @@ func main() {
 	cmds.register("users", handlerUsers)
 	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", handlerAddFeed)
+	cmds.register("feeds", handlerFeeds)
 
 	args := os.Args
 
@@ -215,7 +216,30 @@ func handlerAddFeed(s *state, cmd command) error {
 		return err
 	}
 
-	fmt.Printf("New Feed Created: %v", newFeed)
+	fmt.Printf("New Feed Created: %v\n", newFeed)
+
+	return nil
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	if len(cmd.args) > 0 {
+		return fmt.Errorf("Too many arguments for listing active feeds")
+	}
+
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("Could not retreive feeds: %v", err)
+	}
+
+	for _, feed := range feeds {
+		fmt.Printf("Feed name: %s\n", feed.Name)
+		fmt.Printf("Feed URL: %s\n", feed.Url)
+		user, err := s.db.GetUserByID(context.Background(), feed.UserID)
+		if err != nil {
+			return fmt.Errorf("Could not retrieve user by ID: %v", err)
+		}
+		fmt.Printf("Feed created by: %s\n", user.Name)
+	}
 
 	return nil
 }
