@@ -73,6 +73,7 @@ func main() {
 	cmds.register("reset", handlerReset)
 	cmds.register("users", handlerUsers)
 	cmds.register("agg", handlerAgg)
+	cmds.register("addfeed", handlerAddFeed)
 
 	args := os.Args
 
@@ -142,7 +143,16 @@ func handlerReset(s *state, cmd command) error {
 		return fmt.Errorf("too many arguments for the reset command.")
 	}
 
-	return s.db.Reset(context.Background())
+	err := s.db.ResetFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+	err = s.db.ResetUsers(context.Background())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func handlerUsers(s *state, cmd command) error {
@@ -175,6 +185,38 @@ func handlerAgg(s *state, cmd command) error {
 	}
 
 	fmt.Printf("%v", RSSfeed)
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.args) < 2 {
+		return fmt.Errorf("Too few arguments for adding a feed")
+	}
+
+	if len(cmd.args) > 2 {
+		return fmt.Errorf("Too many arguments for adding a feed")
+	}
+	currentUser, err := s.db.GetUser(context.Background(), s.currentConfig.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("This really shouldn't happen, unless you try to add a fed without having any users before hand")
+	}
+
+	newFeedParams := database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().Local(),
+		UpdatedAt: time.Now().Local(),
+		Name:      cmd.args[0],
+		Url:       cmd.args[1],
+		UserID:    currentUser.ID,
+	}
+
+	newFeed, err := s.db.CreateFeed(context.Background(), newFeedParams)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("New Feed Created: %v", newFeed)
+
 	return nil
 }
 
