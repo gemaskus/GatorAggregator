@@ -75,6 +75,8 @@ func main() {
 	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", handlerAddFeed)
 	cmds.register("feeds", handlerFeeds)
+	cmds.register("follow", handlerFollow)
+	cmds.register("following", handlerFollowing)
 
 	args := os.Args
 
@@ -152,6 +154,10 @@ func handlerReset(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
+	err = s.db.ResetFeedFollows(context.Background())
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -216,6 +222,16 @@ func handlerAddFeed(s *state, cmd command) error {
 		return err
 	}
 
+	newFeedFollowParams := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().Local(),
+		UpdatedAt: time.Now().Local(),
+		UserID:    currentUser.ID,
+		FeedID:    newFeed.ID,
+	}
+
+	_, err = s.db.CreateFeedFollow(context.Background(), newFeedFollowParams)
+
 	fmt.Printf("New Feed Created: %v\n", newFeed)
 
 	return nil
@@ -241,6 +257,61 @@ func handlerFeeds(s *state, cmd command) error {
 		fmt.Printf("Feed created by: %s\n", user.Name)
 	}
 
+	return nil
+}
+
+func handlerFollow(s *state, cmd command) error {
+	if len(cmd.args) != 1 {
+		return fmt.Errorf("Incorrect number of arguments for following an RSS feed.")
+	}
+	url := cmd.args[0]
+
+	currentUser, err := s.db.GetUser(context.Background(),
+		s.currentConfig.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("Could not retreive current user record: %v", err)
+	}
+
+	feed, err := s.db.GetFeedByURL(context.Background(), url)
+	if err != nil {
+		return fmt.Errorf("Coult not retreive feed record: %v", err)
+	}
+
+	newFeedFollowParams := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().Local(),
+		UpdatedAt: time.Now().Local(),
+		UserID:    currentUser.ID,
+		FeedID:    feed.ID,
+	}
+
+	_, err = s.db.CreateFeedFollow(context.Background(), newFeedFollowParams)
+	if err != nil {
+		return fmt.Errorf("Could not create new feed follows record: %v", err)
+	}
+
+	fmt.Printf("User: %s is now following feed: $s",
+		currentUser.Name,
+		feed.Name)
+
+	return nil
+}
+
+func handlerFollowing(s *state, cmd command) error {
+	if len(cmd.args) != 0 {
+		return fmt.Errorf("Too many arguments for getting list of followed feeds.")
+	}
+
+	currentUser, err := s.db.GetUser(context.Background(), s.currentConfig.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("Could not retreive record for current User: %v", err)
+	}
+
+	followedFeeds, err := s.db.GetFeedFollowsByUser(context.Background(), currentUser.ID)
+
+	for _, feed := range followedFeeds {
+		fmt.Printf("%s\n", feed.FeedName)
+	}
 	return nil
 }
 
